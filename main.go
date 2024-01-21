@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -17,9 +18,9 @@ const (
 )
 
 type Task struct {
-	ID     int    `json:"id"`
-	Name   string `json:"name"`
-	Status status `json:"status"`
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Status *status `json:"status"`
 }
 
 var cache sync.Map
@@ -43,51 +44,54 @@ func createTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	task.ID = int(idCounter.Add(1))
-	cache.Store(fmt.Sprint(task.ID), task)
-
+	if task.Name == "" {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "name should not be null"})
+		return
+	}
+	if task.Status == nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "status should not be null"})
+		return
+	}
+	if *task.Status != Incomplete && *task.Status != Completed {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status value"})
+		return
+	}
+	task.ID = fmt.Sprint(idCounter.Add(1))
+	cache.Store(task.ID, task)
 	c.JSON(http.StatusCreated, task)
 }
 
 func updateTask(c *gin.Context) {
 	taskID := c.Param("id")
-	if taskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Task ID is required"})
+	value, ok := cache.Load(taskID)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
+	task := value.(Task)
 
 	var updatedTask Task
 	if err := c.BindJSON(&updatedTask); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	value, ok := cache.Load(taskID)
-	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
-		return
-	}
-
-	task := value.(Task)
 	if updatedTask.Name != "" {
 		task.Name = updatedTask.Name
 	}
-	if updatedTask.Status == Incomplete || updatedTask.Status == Completed {
-		task.Status = updatedTask.Status
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status value"})
-		return
+	if updatedTask.Status != nil {
+		if *updatedTask.Status == Incomplete || *updatedTask.Status == Completed {
+			task.Status = updatedTask.Status
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status value"})
+			return
+		}
 	}
 	cache.Store(taskID, task)
-
 	c.JSON(http.StatusOK, task)
 }
 
 func deleteTask(c *gin.Context) {
 	taskID := c.Param("id")
-	if taskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Task ID is required"})
-		return
-	}
 	if _, ok := cache.LoadAndDelete(taskID); !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
@@ -104,6 +108,6 @@ func main() {
 	r.DELETE("/tasks/:id", deleteTask)
 
 	if err := r.Run(":8080"); err != nil {
-		fmt.Println("Error starting the server:", err)
+		log.Fatal("Error starting the server:", err)
 	}
 }
