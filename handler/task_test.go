@@ -118,3 +118,48 @@ func TestDeleteTask(t *testing.T) {
 
 	assert.Contains(t, w.Body.String(), "Task deleted successfully")
 }
+
+func TestCreateTaskInvalidInput(t *testing.T) {
+	r := gin.Default()
+	r.POST("/tasks", CreateTask)
+
+	// Task with missing name
+	invalidTask := model.Task{
+		Status: new(model.Status),
+	}
+
+	jsonTask, err := json.Marshal(invalidTask)
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest("POST", "/tasks", bytes.NewBuffer(jsonTask))
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+}
+
+func TestUpdateTaskNotFound(t *testing.T) {
+	r := gin.Default()
+	r.PUT("/tasks/:id", UpdateTask)
+
+	// Task not found
+	nonExistingID := "100"
+	updatedTask := model.Task{
+		ID:     nonExistingID,
+		Name:   "Updated Task",
+		Status: new(model.Status),
+	}
+	*updatedTask.Status = model.Completed
+
+	jsonTask, err := json.Marshal(updatedTask)
+	assert.NoError(t, err)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/tasks/%s", nonExistingID), bytes.NewBuffer(jsonTask))
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
