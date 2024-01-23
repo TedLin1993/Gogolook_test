@@ -137,7 +137,9 @@ func TestCreateTaskInvalidInput(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
+
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, w.Body.String(), "name should not be null")
 }
 
 func TestUpdateTaskNotFound(t *testing.T) {
@@ -161,5 +163,41 @@ func TestUpdateTaskNotFound(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
+
 	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "Task not found")
+}
+
+func TestUpdateTaskInvalidStatus(t *testing.T) {
+	r := gin.Default()
+	r.PUT("/tasks/:id", UpdateTask)
+
+	existingTask := model.Task{
+		ID:     "1",
+		Name:   "Existing Task",
+		Status: new(model.Status),
+	}
+	*existingTask.Status = model.Incomplete
+	cache.Store(existingTask.ID, existingTask)
+
+	// Try to update the task with an invalid status
+	updatedTask := model.Task{
+		ID:     existingTask.ID,
+		Name:   "Updated Task",
+		Status: new(model.Status),
+	}
+	*updatedTask.Status = 999 // Invalid status
+
+	jsonTask, err := json.Marshal(updatedTask)
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest("PUT", fmt.Sprintf("/tasks/%s", updatedTask.ID), bytes.NewBuffer(jsonTask))
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid status value")
 }
