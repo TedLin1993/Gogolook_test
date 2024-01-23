@@ -140,6 +140,48 @@ func TestCreateTaskInvalidInput(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 	assert.Contains(t, w.Body.String(), "name should not be null")
+
+	// Task with missing status
+	invalidTask = model.Task{
+		Name: "Invalid Task",
+	}
+
+	jsonTask, err = json.Marshal(invalidTask)
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest("POST", "/tasks", bytes.NewBuffer(jsonTask))
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
+	assert.Contains(t, w.Body.String(), "status should not be null")
+}
+
+func TestCreateTaskInvalidStatus(t *testing.T) {
+	r := gin.Default()
+	r.POST("/tasks", CreateTask)
+
+	invalidTask := model.Task{
+		Name:   "Invalid Task",
+		Status: new(model.Status),
+	}
+	*invalidTask.Status = 999 // Invalid status
+
+	jsonTask, err := json.Marshal(invalidTask)
+	assert.NoError(t, err)
+
+	req, err := http.NewRequest("POST", "/tasks", bytes.NewBuffer(jsonTask))
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Invalid status value")
 }
 
 func TestUpdateTaskNotFound(t *testing.T) {
@@ -200,4 +242,29 @@ func TestUpdateTaskInvalidStatus(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "Invalid status value")
+}
+
+func TestDeleteTaskNotFound(t *testing.T) {
+	r := gin.Default()
+	r.DELETE("/tasks/:id", DeleteTask)
+
+	// Task not found
+	nonExistingID := "100"
+	deletedTask := model.Task{
+		ID:     nonExistingID,
+		Name:   "Updated Task",
+		Status: new(model.Status),
+	}
+
+	jsonTask, err := json.Marshal(deletedTask)
+	assert.NoError(t, err)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("/tasks/%s", nonExistingID), bytes.NewBuffer(jsonTask))
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, w.Body.String(), "Task not found")
 }
