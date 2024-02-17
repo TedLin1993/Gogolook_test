@@ -9,6 +9,6 @@ const (
 
 type Task struct {
 	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Status *Status `json:"status"`
+	Name   string  `json:"name" validate:"required"`
+	Status *Status `json:"status" validate:"required,validStatus"`
 }

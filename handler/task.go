@@ -1,7 +1,8 @@
 package handler
 
 import (
-	"Gogolook_test/model"
+	. "SimpleApi/model"
+	"SimpleApi/validation"
 	"fmt"
 	"net/http"
 	"sync"
@@ -10,13 +11,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var cache sync.Map
-var idCounter atomic.Int64
+var _cache sync.Map
+var _idCounter atomic.Int64
+var _validate = validation.Init()
 
 func GetTasks(c *gin.Context) {
-	var tasks []model.Task
-	cache.Range(func(key, value any) bool {
-		task, ok := value.(model.Task)
+	var tasks []Task
+	_cache.Range(func(key, value any) bool {
+		task, ok := value.(Task)
 		if ok {
 			tasks = append(tasks, task)
 		}
@@ -26,38 +28,33 @@ func GetTasks(c *gin.Context) {
 }
 
 func CreateTask(c *gin.Context) {
-	var task model.Task
+	var task Task
 	if err := c.BindJSON(&task); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if task.Name == "" {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "name should not be null"})
+
+	err := _validate.Struct(task)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if task.Status == nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "status should not be null"})
-		return
-	}
-	if *task.Status != model.Incomplete && *task.Status != model.Completed {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status value"})
-		return
-	}
-	task.ID = fmt.Sprint(idCounter.Add(1))
-	cache.Store(task.ID, task)
+
+	task.ID = fmt.Sprint(_idCounter.Add(1))
+	_cache.Store(task.ID, task)
 	c.JSON(http.StatusCreated, task)
 }
 
 func UpdateTask(c *gin.Context) {
 	taskID := c.Param("id")
-	value, ok := cache.Load(taskID)
+	value, ok := _cache.Load(taskID)
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
-	task := value.(model.Task)
+	task := value.(Task)
 
-	var updatedTask model.Task
+	var updatedTask Task
 	if err := c.BindJSON(&updatedTask); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -66,20 +63,25 @@ func UpdateTask(c *gin.Context) {
 		task.Name = updatedTask.Name
 	}
 	if updatedTask.Status != nil {
-		if *updatedTask.Status == model.Incomplete || *updatedTask.Status == model.Completed {
+		err := _validate.Struct(task)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if *updatedTask.Status == Incomplete || *updatedTask.Status == Completed {
 			task.Status = updatedTask.Status
 		} else {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status value"})
 			return
 		}
 	}
-	cache.Store(taskID, task)
+	_cache.Store(taskID, task)
 	c.JSON(http.StatusOK, task)
 }
 
 func DeleteTask(c *gin.Context) {
 	taskID := c.Param("id")
-	if _, ok := cache.LoadAndDelete(taskID); !ok {
+	if _, ok := _cache.LoadAndDelete(taskID); !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}

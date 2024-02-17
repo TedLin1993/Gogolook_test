@@ -1,4 +1,4 @@
-module Gogolook_test
+module SimpleApi
 
 go 1.21.5
 

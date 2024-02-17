@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"Gogolook_test/model"
+	"SimpleApi/model"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -47,7 +47,7 @@ func TestGetTasks(t *testing.T) {
 		Name:   "Existing Task",
 		Status: new(model.Status),
 	}
-	cache.Store(existingTask.ID, existingTask)
+	_cache.Store(existingTask.ID, existingTask)
 
 	r := gin.Default()
 	r.GET("/tasks", GetTasks)
@@ -72,7 +72,7 @@ func TestUpdateTask(t *testing.T) {
 		Status: new(model.Status),
 	}
 	*existingTask.Status = model.Incomplete
-	cache.Store(existingTask.ID, existingTask)
+	_cache.Store(existingTask.ID, existingTask)
 
 	r := gin.Default()
 	r.PUT("/tasks/:id", UpdateTask)
@@ -106,7 +106,7 @@ func TestDeleteTask(t *testing.T) {
 		Status: new(model.Status),
 	}
 	*existingTask.Status = model.Incomplete
-	cache.Store(existingTask.ID, existingTask)
+	_cache.Store(existingTask.ID, existingTask)
 
 	r := gin.Default()
 	r.DELETE("/tasks/:id", DeleteTask)
@@ -220,7 +220,7 @@ func TestUpdateTaskInvalidStatus(t *testing.T) {
 		Status: new(model.Status),
 	}
 	*existingTask.Status = model.Incomplete
-	cache.Store(existingTask.ID, existingTask)
+	_cache.Store(existingTask.ID, existingTask)
 
 	// Try to update the task with an invalid status
 	updatedTask := model.Task{

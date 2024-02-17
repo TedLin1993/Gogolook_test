@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"Gogolook_test/handler"
+	"SimpleApi/handler"
 
 	"github.com/gin-gonic/gin"
 )
